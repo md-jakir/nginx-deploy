@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: proxy-nginx
+  name: proxy-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy-nginx
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: proxy-nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-data
+          mountPath: /etc/nginx/conf.d/
+      volumes:
+      - name: nginx-data
+        hostPath:
+          path: /nginx-config
+      nodeSelector:
+        hostname: k8s-master
+---
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: proxy-nginx
+  name: ngix-svc
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+    nodePort: 32030
+  selector:
+    app: proxy-nginx
+  type: NodePort
