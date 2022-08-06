@@ -5,8 +5,12 @@ Here, I have deployed two laravel applications along with two nodeport services 
 Since we're accessing the application via nginx nodeport service that's why I configure default.conf file mentioning the application's service name and container's port where to exposing like below.
 
 proxy_pass http://laravel-svc:8000/app1;
+proxy_pass http://laravel-app2-svc:8000/app2;
 
-where, laravel-svc is service name for applicaiton one and 8000 is the container port. But we can create application service type as ClusterIP because we're accessing the application through nginx proxy. 
+where, laravel-svc and laravel-app2-svc are service name for applicaitons one and 8000 is the container port. But we can create application service type as ClusterIP because we're accessing the application through nginx proxy so only nginx service type would be nodeport. 
+
+App 1 URL: http://192.168.56.119:32030/app1/
+App 2 URL: http://192.168.56.119:32030/app2/
 
 
 
