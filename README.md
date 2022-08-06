@@ -6,7 +6,7 @@ Since we're accessing the application via nginx nodeport service that's why I co
 
 proxy_pass http://laravel-svc:8000/app1;
 
-where, laravel-svc is service name for applicaiton one and 8000 is the container port. But we can create application service type as ClusterIP as we're accessing the application through nginx proxy. 
+where, laravel-svc is service name for applicaiton one and 8000 is the container port. But we can create application service type as ClusterIP because we're accessing the application through nginx proxy. 
 
 
 
