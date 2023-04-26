@@ -1,0 +1,221 @@
+#user  nobody;
+#worker_processes  1;
+worker_processes  auto;
+
+#error_log  logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+
+#pid        logs/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                     '$status $body_bytes_sent "$http_referer" user=$remote_user nginx_version=$nginx_version http_x_header=$http_x_header uri_query=$query_string'
+                      'uri_path=$uri http_method=$request_method response_time=$upstream_response_time request_time="$request_time '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #log_format custom 'site="$server_name" server="$host" dest_port="$server_port" dest_ip="$server_addr" '
+    #                   'src="$remote_addr" user="$remote_user" '
+    #                   'time_local="$time_local" protocol="$server_protocol" status="$status" '
+    #                   'bytes_out="$bytes_sent" bytes_in="$upstream_bytes_received" '
+    #                   'http_referer="$http_referer" http_user_agent="$http_user_agent" '
+    #                   'nginx_version="$nginx_version" http_x_forwarded_for="$http_x_forwarded_for" '
+    #                   'http_x_header="$http_x_header" uri_query="$query_string" uri_path="$uri" '
+    #                   'http_method="$request_method" response_time="$upstream_response_time" '
+    #                   'cookie="$http_cookie" request_time="$request_time" category="$sent_http_content_type" https="$https"';
+
+    access_log  logs/access.log main;
+    error_log  logs/error.log error;
+
+    # limit the number of connections per single IP
+    limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:100m;
+
+    # limit the number of requests for a given session
+    limit_req_zone $binary_remote_addr zone=req_limit_per_ip:100m rate=5r/s;
+
+    #log_format custom 'site="$server_name" server="$host" dest_port="$server_port" dest_ip="$server_addr" '
+    #                   'src="$remote_addr" user="$remote_user" '
+    #                   'time_local="$time_local" protocol="$server_protocol" status="$status" '
+    #                   'bytes_out="$bytes_sent" bytes_in="$upstream_bytes_received" '
+    #                   'http_referer="$http_referer" http_user_agent="$http_user_agent" '
+    #                   'nginx_version="$nginx_version" http_x_forwarded_for="$http_x_forwarded_for" '
+    #                   'http_x_header="$http_x_header" uri_query="$query_string" uri_path="$uri" '
+    #                   'http_method="$request_method" response_time="$upstream_response_time" '
+    #                   'cookie="$http_cookie" request_time="$request_time" category="$sent_http_content_type" https="$https"';
+
+    #access_log  logs/access.log custom buffer=16k;
+    #error_log   logs/error.log error;
+
+    upstream non_bl_app {
+    server localhost:3000;
+    }
+
+    sendfile    on;
+    tcp_nopush  on;
+    tcp_nodelay on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  35;
+
+    gzip  on;
+    gzip_min_length 256;
+    gzip_comp_level 4;
+    gzip_vary on;
+    gzip_disable msie6;
+    gzip_proxied expired no-cache no-store private auth;
+
+    gzip_types
+    application/atom+xml
+    application/javascript
+    application/json
+    application/rss+xml
+    application/vnd.ms-fontobject
+    application/x-font-ttf
+    application/x-web-app-manifest+json
+    application/xhtml+xml
+    application/xml
+    font/opentype
+    image/svg+xml
+    image/x-icon
+    text/css
+    text/plain
+    text/x-component;
+
+    # allow the server to close connection on non responding client, this will free up memory
+    reset_timedout_connection on;
+
+    # request timed out -- default 60
+    client_body_timeout 10;
+
+    # if client stop responding, free up memory -- default 60
+    send_timeout 2;
+
+    # number of requests client can make over keep-alive -- for testing environment
+    keepalive_requests 100;
+
+    server_tokens off;
+
+    server {
+        listen       8443;
+        listen [::1]:8443;
+        server_name  myblapi-test.banglalink.net;
+        client_body_buffer_size 16K;
+        client_header_buffer_size 1k;
+        client_max_body_size 8m;
+        large_client_header_buffers 4 8k;
+        client_body_in_single_buffer on;
+        open_file_cache max=3000 inactive=120s;
+        open_file_cache_valid 120s;
+        open_file_cache_min_uses 4;
+        open_file_cache_errors on;
+
+
+        location /auth {
+            rewrite ^/auth(.*)$ $1 break;
+            proxy_set_header X-Original-URI $1;
+            proxy_pass http://non_bl_app;
+            proxy_read_timeout     300;
+            proxy_connect_timeout  300;
+            proxy_redirect         off;
+
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+            proxy_buffers 8 32k;
+            proxy_buffer_size 32k;
+            fastcgi_buffers 32 32k;
+            fastcgi_buffer_size 32k;
+            tcp_nopush on;
+          }
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+        #access_log  /app/myblapi/opt/logs/access.log custom buffer=16k;
+        #error_log  /app/myblapi/opt/logs/error.log error;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+
+        #error_page  404              /404.html;
+
+        # redirect server error pages to the static page /50x.html
+        #
+    #    error_page   500 502 503 504  /50x.html;
+    #    location = /50x.html {
+    #        root   html;
+    #    }
+
+        # proxy the PHP scripts to Apache listening on 127.0.0.1:80
+        #
+        #location ~ \.php$ {
+        #    proxy_pass   http://127.0.0.1;
+        #}
+
+        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+        #
+        #location ~ \.php$ {
+        #    root           html;
+        #    fastcgi_pass   127.0.0.1:9000;
+        #    fastcgi_index  index.php;
+        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+        #    include        fastcgi_params;
+        #}
+
+        # deny access to .htaccess files, if Apache's document root
+        # concurs with nginx's one
+        #
+        location ~ /\.ht {
+            deny  all;
+        }
+    }
+
+
+    # another virtual host using mix of IP-, name-, and port-based configuration
+    #
+    #server {
+    #    listen       8000;
+    #    listen       somename:8080;
+    #    server_name  somename  alias  another.alias;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+
+
+    # HTTPS server
+    #
+    #server {
+    #    listen       443 ssl;
+    #    server_name  localhost;
+
+    #    ssl_certificate      cert.pem;
+    #    ssl_certificate_key  cert.key;
+
+    #    ssl_session_cache    shared:SSL:1m;
+    #    ssl_session_timeout  5m;
+
+    #    ssl_ciphers  HIGH:!aNULL:!MD5;
+    #    ssl_prefer_server_ciphers  on;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+    #incldue /app/myblapi/opt/nginx/conf.d/*.conf;
+
+}
