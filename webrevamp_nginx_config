@@ -1,0 +1,330 @@
+#user  nobody;
+worker_processes auto;
+
+#error_log  logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+
+#pid        logs/nginx.pid;
+
+worker_rlimit_nofile 1024;
+events {
+    worker_connections 1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    # limit the number of connections per single IP
+    limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:400m;
+
+    # limit the number of requests for a given session
+    limit_req_zone $binary_remote_addr zone=req_limit_per_ip:400m rate=5r/s;
+
+
+
+    #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+    #                  '$status $body_bytes_sent "$http_referer" '
+    #                  '"$http_user_agent" "$http_x_forwarded_for"';
+    #log_format  custom '$remote_addr - $remote_user [$time_local] '
+    #                                '"$request" $status $body_bytes_sent '
+    #                                '"$http_referer" "$http_user_agent" '
+    #                                '"$http_x_forwarded_for" $request_id '
+    #                                '$upstream_bytes_received "$sent_http_content_type" $host "$https" "$http_cookie" ';
+
+    #log_format custom 'site="$server_name" server="$host" dest_port="$server_port" dest_ip="$server_addr" '
+    #                   'src="$remote_addr" user="$remote_user" '
+    #                   'time_local="$time_local" protocol="$server_protocol" status="$status" '
+    #                   'bytes_out="$bytes_sent" bytes_in="$upstream_bytes_received" '
+    #                   'http_referer="$http_referer" http_user_agent="$http_user_agent" '
+    #                   'nginx_version="$nginx_version" http_x_forwarded_for="$http_x_forwarded_for" '
+    #                   'http_x_header="$http_x_header" uri_query="$query_string" uri_path="$uri" '
+    #                   'http_method="$request_method" response_time="$upstream_response_time" '
+    #                   'cookie="$http_cookie" request_time="$request_time" category="$sent_http_content_type" https="$https"';
+
+    log_format custom '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" user=$remote_user nginx_version=$nginx_version http_x_header=$http_x_header uri_query=$query_string'
+                      'uri_path=$uri http_method=$request_method response_time=$upstream_response_time request_time="$request_time '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /app/asset_lite_prd/opt/nginx/logs/access.log custom buffer=16k flush=3m;
+    error_log  /app/asset_lite_prd/opt/nginx/logs/error.log error;
+    #access_log off;
+
+    upstream npm_node {
+    server localhost:3000;
+    }
+
+    sendfile        on;
+    tcp_nopush     on;
+    tcp_nodelay on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65s;
+
+    gzip  on;
+    gzip_min_length 256;
+    gzip_comp_level 4;
+    gzip_vary on;
+    gzip_disable msie6;
+    gzip_proxied expired no-cache no-store private auth;
+
+    gzip_types
+    application/atom+xml
+    application/javascript
+    application/json
+    application/rss+xml
+    application/vnd.ms-fontobject
+    application/x-font-ttf
+    application/x-web-app-manifest+json
+    application/xhtml+xml
+    application/xml
+    font/opentype
+    image/svg+xml
+    image/x-icon
+    text/css
+    text/plain
+    text/x-component;
+
+
+    # allow the server to close connection on non responding client, this will free up memory
+    reset_timedout_connection on;
+
+    # request timed out -- default 60
+    client_body_timeout 10;
+
+    # if client stop responding, free up memory -- default 60
+    send_timeout 40;
+
+    # number of requests client can make over keep-alive -- for testing environment
+    keepalive_requests 100;
+
+    server_tokens off;
+    server {
+        listen       8443;
+        listen       [::]:3000;
+        server_name  stage1.banglalink.net;
+        #server_name  banglalink.net www.banglalink.net;
+        #return 301 $scheme://www.banglalink.net$request_uri;
+        #limit_conn conn_limit_per_ip 200;
+        #limit_req zone=req_limit_per_ip burst=100 nodelay;
+        ########CROS
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, PUT';
+        add_header 'Access-Control-Max-Age' 1000;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Headers' 'x-requested-with,Content-Type,origin,authorization,accept,browser,msisdn,platfrom,X-Frame-Options,Cache-Control,Pragma,X-Content-Type-Options,X-XSS-Protection,client-security-token,api-key,timestamp';
+        add_header 'Access-Control-Allow-Headers' '*' always;
+
+        client_body_buffer_size 16K;
+        client_header_buffer_size 1k;
+        client_max_body_size 8m;
+        large_client_header_buffers 4 8k;
+        client_body_in_single_buffer on;
+        open_file_cache max=3000 inactive=120s;
+        open_file_cache_valid 120s;
+        open_file_cache_min_uses 4;
+        open_file_cache_errors on;
+
+        #location / {
+        ####################### Newly Added
+
+            add_header 'Access-Control-Allow-Origin' '*' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range';
+            add_header 'Access-Control-Allow-Methods' 'GET,POST,OPTIONS,PUT,DELETE,PATCH';
+        location / {
+          if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Headers' 'Authorization,Accept,Origin,DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range';
+            add_header 'Access-Control-Allow-Methods' 'GET,POST,OPTIONS,PUT,DELETE,PATCH';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+         }
+
+
+           proxy_pass http://npm_node;
+           proxy_read_timeout     300;
+           proxy_connect_timeout  300;
+           proxy_redirect         off;
+
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header Host $host;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+           proxy_buffers 8 32k;
+           proxy_buffer_size 32k;
+           fastcgi_buffers 32 32k;
+           fastcgi_buffer_size 32k;
+           tcp_nopush on;
+
+     }
+
+   }
+
+    server {
+        listen        8443;
+        server_name   api-stage1.banglalink.net;
+        root /app/asset_lite_prd/www/bl_assetelite_api/public;
+        index index.html index.htm index.php;
+
+        location /api {
+            root  /app/asset_lite_prd/www/bl_assetelite_api/public;
+            index  index.php index.html index.htm;
+            try_files $uri /index.php$is_args$args;
+        }
+
+
+        location  / {
+            root   /app/asset_lite_prd/www/bl_assetelite_api/public;
+            try_files $uri /index.php$is_args$args;
+            index  index.php index.html;
+
+            # CORS CONFIGURE
+            if ($http_origin ~* .*) {
+                set $cors "true";
+            }
+            if ($request_method = OPTIONS) {
+                set $cors "${cors}options";
+            }
+            if ($request_method = GET) {
+                set $cors "${cors}get";
+            }
+            if ($request_method = POST) {
+                set $cors "${cors}post";
+            }
+            if ($cors = 'trueget') {
+                add_header 'Access-Control-Allow-Origin' "$http_origin";
+                add_header 'Access-Control-Allow-Credentials' 'true';
+            }
+            if ($cors = 'truepost') {
+                add_header 'Access-Control-Allow-Origin' "$http_origin";
+                add_header 'Access-Control-Allow-Credentials' 'true';
+            }
+            if ($cors = 'trueoptions') {
+                add_header 'Access-Control-Allow-Origin' "$http_origin";
+                add_header 'Access-Control-Allow-Credentials' 'true';
+
+                add_header 'Access-Control-Max-Age' 1728000; # cache preflight value for 20 days
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, UPDATE, PUT';
+                #add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since';
+                add_header 'Access-Control-Allow-Headers' 'x-requested-with,Content-Type,origin,authorization,accept,browser,msisdn,platfrom,X-Frame-Options,Cache-Control,Pragma,X-Content-Type-Options,X-XSS-Protection,client-security-token,api-key,timestamp';
+
+                add_header 'Content-Length' 0;
+                add_header 'Content-Type' 'text/plain charset=UTF-8';
+                return 204;
+            }
+        }
+        location ~ [^/]\.php(/|$) {
+            root  /app/asset_lite_prd/www/bl_assetelite_api/public;
+            fastcgi_split_path_info ^(.+?\.php)(/.*)$;
+            try_files $uri $uri/ /index.php$is_args$args;
+            fastcgi_pass   127.0.0.1:8999;
+            fastcgi_index  index.php;
+            fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+            include        fastcgi_params;
+            include        fastcgi.conf;
+
+            # CORS CONFIGURE
+            if ($http_origin ~* .*) {
+                set $cors "true";
+            }
+            if ($request_method = OPTIONS) {
+                set $cors "${cors}options";
+            }
+            if ($request_method = GET) {
+                set $cors "${cors}get";
+            }
+            if ($request_method = POST) {
+                set $cors "${cors}post";
+            }
+            if ($cors = 'trueget') {
+                add_header 'Access-Control-Allow-Origin' "$http_origin";
+                add_header 'Access-Control-Allow-Credentials' 'true';
+            }
+            if ($cors = 'truepost') {
+                add_header 'Access-Control-Allow-Origin' "$http_origin";
+                add_header 'Access-Control-Allow-Credentials' 'true';
+            }
+            if ($cors = 'trueoptions') {
+                add_header 'Access-Control-Allow-Origin' "$http_origin";
+                add_header 'Access-Control-Allow-Credentials' 'true';
+
+                add_header 'Access-Control-Max-Age' 1728000; # cache preflight value for 20 days
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, UPDATE, PUT';
+                #add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since';
+                add_header 'Access-Control-Allow-Headers' 'x-requested-with,Content-Type,origin,authorization,accept,browser,msisdn,platfrom,X-Frame-Options,Cache-Control,Pragma,X-Content-Type-Options,X-XSS-Protection,client-security-token,api-key,timestamp';
+
+                add_header 'Content-Length' 0;
+                add_header 'Content-Type' 'text/plain charset=UTF-8';
+                return 204;
+            }
+         }
+
+        location ~ /\.(?!well-known).* {
+                deny all;
+        }
+
+    }
+
+    #server {
+#
+#       listen  8443;
+#       server_name   mybl.banglalink.net;
+#       root    /app/asset_lite_prd/www/mybl_lite_frontend;
+#
+#
+#       location = / {
+#            root   /app/asset_lite_prd/www/mybl_lite_frontend;
+#            try_files $uri /index.php$is_args$args;
+#            index  index.php index.html;
+#
+#            # CORS CONFIGURE
+#            if ($http_origin ~* .*) {
+#                set $cors "true";
+#            }
+#            if ($request_method = OPTIONS) {
+#                set $cors "${cors}options";
+#            }
+#            if ($request_method = GET) {
+#                set $cors "${cors}get";
+#            }
+#            if ($request_method = POST) {
+#                set $cors "${cors}post";
+#            }
+#            if ($cors = 'trueget') {
+#                add_header 'Access-Control-Allow-Origin' "$http_origin";
+#                add_header 'Access-Control-Allow-Credentials' 'true';
+#            }
+#            if ($cors = 'truepost') {
+#                add_header 'Access-Control-Allow-Origin' "$http_origin";
+#                add_header 'Access-Control-Allow-Credentials' 'true';
+#            }
+#            if ($cors = 'trueoptions') {
+#                add_header 'Access-Control-Allow-Origin' "$http_origin";
+#                add_header 'Access-Control-Allow-Credentials' 'true';
+#
+#                add_header 'Access-Control-Max-Age' 1728000; # cache preflight value for 20 days
+#                add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, DELETE, UPDATE, PUT';
+                #add_header 'Access-Control-Allow-Headers' 'Authorization,Content-Type,Accept,Origin,User-Agent,DNT,Cache-Control,X-Mx-ReqToken,Keep-Alive,X-Requested-With,If-Modified-Since';
+#                add_header 'Access-Control-Allow-Headers' 'x-requested-with,Content-Type,origin,authorization,accept,browser,msisdn,platfrom,X-Frame-Options,Cache-Control,Pragma,X-Content-Type-Options,X-XSS-Protection,client-security-token,api-key,timestamp';
+#
+#                add_header 'Content-Length' 0;
+#                add_header 'Content-Type' 'text/plain charset=UTF-8';
+#                return 204;
+#            }
+#        }
+#    }
+
+    #server {
+    #   listen  8443;
+    #   server_name     eselfcare.banglalink.net *.eselfcare.banglalink.net;
+    #   return 301 $scheme://mybl.banglalink.net$request_uri;
+    #   access_log      /app/asset_lite_prd/opt/nginx/logs/eslf.log;
+    #}
+}
